@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>German Aussprache Lab — Open-Source Phoneme Pronunciation Scorer</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --surface: #ffffff;
+      --surface-subtle: #f1f4f8;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --text-faint: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --good: #059669;
+      --good-bg: #ecfdf5;
+      --good-border: #a7f3d0;
+      --fair: #d97706;
+      --fair-bg: #fffbeb;
+      --fair-border: #fde68a;
+      --error: #dc2626;
+      --error-bg: #fef2f2;
+      --error-border: #fecaca;
+      --omitted: #64748b;
+      --omitted-bg: #f1f5f9;
+      --omitted-border: #cbd5e1;
+      --ins: #2563eb;
+      --ins-bg: #eff6ff;
+      --radius: 14px;
+      --radius-sm: 9px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 6px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .ipa {
+      font-family: "DejaVu Sans", "Gentium Plus", "Noto Sans", "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0.01em;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--surface-subtle);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+    .status-pill.ready .status-dot { background: var(--good); box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2); }
+    .status-pill.loading .status-dot { background: var(--fair); animation: pulse 1.2s infinite; }
+    .status-pill.error .status-dot { background: var(--error); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--text-faint);
+      margin: 2px 0 0;
+    }
+
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .preset-chip {
+      border: 1px solid var(--border);
+      background: var(--surface-subtle);
+      color: var(--text-muted);
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .preset-chip:hover {
+      border-color: #94a3b8;
+      color: var(--text);
+    }
+    .preset-chip.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .sentence-box {
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+
+    .sentence-input-wrap {
+      flex: 1 1 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    textarea#referenceText {
+      width: 100%;
+      min-height: 62px;
+      resize: vertical;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 19px;
+      font-weight: 600;
+      font-family: inherit;
+      color: var(--text);
+      background: #fbfcfe;
+      transition: border-color 0.15s ease;
+    }
+    textarea#referenceText:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #fff;
+    }
+
+    .sentence-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--text-faint);
+    }
+
+    .focus-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .focus-tag {
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    button.btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    button.btn:hover:not(:disabled) {
+      background: var(--surface-subtle);
+      border-color: #cbd5e1;
+    }
+    button.btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    button.btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    button.btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    button.btn-record {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #fff;
+    }
+    button.btn-record:hover:not(:disabled) {
+      background: #b91c1c;
+    }
+    button.btn-record.recording {
+      animation: recPulse 1.1s infinite;
+    }
+
+    @keyframes recPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+      50% { box-shadow: 0 0 0 9px rgba(220, 38, 38, 0); }
+    }
+
+    .meter-wrap {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      color: #b91c1c;
+    }
+    .meter-wrap.visible { display: inline-flex; }
+
+    canvas#levelMeter {
+      width: 90px;
+      height: 18px;
+      border-radius: 4px;
+      background: #fee2e2;
+    }
+
+    /* Built-in demo samples */
+    .samples-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+      gap: 10px;
+    }
+
+    .sample-card {
+      text-align: left;
+      border: 1px solid var(--border);
+      background: #fbfcfe;
+      border-radius: var(--radius-sm);
+      padding: 11px 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .sample-card:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      transform: translateY(-1px);
+    }
+    .sample-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16);
+      background: var(--accent-soft);
+    }
+
+    .sample-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 7px;
+      border-radius: 999px;
+      width: fit-content;
+    }
+    .sample-badge.native { background: var(--good-bg); color: var(--good); border: 1px solid var(--good-border); }
+    .sample-badge.mispronounced { background: var(--error-bg); color: var(--error); border: 1px solid var(--error-border); }
+
+    .sample-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .sample-desc {
+      font-size: 12px;
+      color: var(--text-faint);
+      line-height: 1.35;
+    }
+
+    /* Results */
+    #resultsSection {
+      display: none;
+      gap: 20px;
+    }
+    #resultsSection.visible {
+      display: grid;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 24px;
+      align-items: center;
+    }
+    @media (max-width: 720px) {
+      .summary-grid { grid-template-columns: 1fr; }
+    }
+
+    .gauge-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gauge-svg {
+      width: 156px;
+      height: 156px;
+    }
+
+    .gauge-score {
+      font-size: 36px;
+      font-weight: 800;
+      fill: var(--text);
+    }
+    .gauge-label {
+      font-size: 12px;
+      font-weight: 600;
+      fill: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .metrics-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: 150px 1fr 56px;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .metric-label { font-weight: 600; color: var(--text-muted); }
+    .metric-bar-bg {
+      height: 10px;
+      background: var(--surface-subtle);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.5s ease;
+    }
+    .metric-val {
+      text-align: right;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .audio-playback-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    audio#userAudioPlayer {
+      flex: 1 1 280px;
+      height: 36px;
+    }
+
+    /* Word strip */
+    .words-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .word-pill {
+      border-radius: 12px;
+      padding: 10px 14px;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 78px;
+    }
+    .word-pill:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(15,23,42,0.08); }
+    .word-pill.selected { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25); }
+
+    .word-pill.good { background: var(--good-bg); border-color: var(--good-border); color: #065f46; }
+    .word-pill.fair { background: var(--fair-bg); border-color: var(--fair-border); color: #92400e; }
+    .word-pill.error { background: var(--error-bg); border-color: var(--error-border); color: #991b1b; }
+    .word-pill.omitted { background: var(--omitted-bg); border-color: var(--omitted-border); border-style: dashed; color: #475569; }
+
+    .word-pill-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .word-pill-text { font-size: 18px; font-weight: 700; }
+    .word-pill-score { font-size: 12px; font-weight: 700; opacity: 0.85; }
+    .word-pill-ipa { font-size: 13px; opacity: 0.8; }
+
+    /* Phoneme breakdown */
+    .phoneme-words-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .phoneme-word-group {
+      background: #fbfcfe;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .phoneme-word-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .phoneme-tiles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .ph-tile {
+      min-width: 52px;
+      padding: 6px 8px;
+      border-radius: 9px;
+      border: 1.5px solid transparent;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .ph-tile:hover { transform: translateY(-1px); }
+    .ph-tile.selected { outline: 2.5px solid var(--accent); outline-offset: 1px; }
+
+    .ph-tile.good { background: var(--good-bg); border-color: var(--good-border); color: #065f46; }
+    .ph-tile.fair { background: var(--fair-bg); border-color: var(--fair-border); color: #92400e; }
+    .ph-tile.error { background: var(--error-bg); border-color: var(--error-border); color: #991b1b; }
+    .ph-tile.omitted { background: var(--omitted-bg); border-color: var(--omitted-border); border-style: dashed; color: #475569; }
+
+    .ph-sym { font-size: 17px; font-weight: 700; line-height: 1.15; }
+    .ph-sub { font-size: 11px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
+    .ph-dur { font-size: 10px; opacity: 0.65; }
+
+    /* Inspector panel */
+    .inspector-box {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      display: none;
+    }
+    .inspector-box.visible { display: block; }
+    .inspector-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .inspector-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .stat-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .stat-chip strong { color: var(--text); }
+
+    /* Coaching issues */
+    .issues-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .issue-item {
+      border-radius: 11px;
+      padding: 13px 15px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .issue-item.error { background: var(--error-bg); border-color: var(--error-border); }
+    .issue-item.fair { background: var(--fair-bg); border-color: var(--fair-border); }
+    .issue-item.omitted { background: var(--omitted-bg); border-color: var(--omitted-border); }
+
+    .issue-head {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .issue-body { font-size: 13.5px; color: var(--text); }
+    .issue-tip { font-size: 12.5px; color: var(--text-muted); margin-top: 5px; }
+
+    /* Free decoding IPA diff */
+    .diff-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .diff-tok {
+      padding: 4px 8px;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface-subtle);
+    }
+    .diff-tok.match { background: var(--good-bg); border-color: var(--good-border); color: #065f46; }
+    .diff-tok.sub { background: var(--error-bg); border-color: var(--error-border); color: #991b1b; }
+    .diff-tok.del { background: var(--omitted-bg); border-color: var(--omitted-border); color: #64748b; text-decoration: line-through; }
+    .diff-tok.ins { background: var(--ins-bg); border-color: #bfdbfe; color: var(--ins); }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-faint);
+    }
+    .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+    .error-banner {
+      display: none;
+      background: var(--error-bg);
+      color: #991b1b;
+      border: 1px solid var(--error-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .error-banner.visible { display: block; }
+
+    .loading-overlay {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      background: var(--accent-soft);
+      border: 1px solid #bfdbfe;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .loading-overlay.visible { display: flex; }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid #bfdbfe;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer {
+      max-width: 1120px;
+      margin: 0 auto 36px;
+      padding: 0 24px;
+      font-size: 12.5px;
+      color: var(--text-faint);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark ipa">üç</div>
+        <div>
+          <h1>German Aussprache Lab</h1>
+          <p>Open-source phoneme pronunciation assessment &middot; espeak-ng + wav2vec2 IPA + CTC Forced Alignment + Logit-GOP</p>
+        </div>
+      </div>
+      <div id="modelStatus" class="status-pill loading">
+        <span class="status-dot"></span>
+        <span id="modelStatusText">Loading model...</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Step 1: Sentence & Audio Input -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">1. Choose or Type a German Sentence</h2>
+          <p class="card-subtitle">Pick a practice prompt targeting tricky German sounds, or write your own sentence.</p>
+        </div>
+        <button id="playRefBtn" class="btn" type="button" disabled>
+          &#9654; Listen to Native Reference
+        </button>
+      </div>
+
+      <div id="presetRow" class="preset-row"></div>
+
+      <div class="sentence-box">
+        <div class="sentence-input-wrap">
+          <textarea id="referenceText" rows="2" placeholder="Type any German sentence...">Ich möchte eine Hütte mieten.</textarea>
+          <div class="sentence-meta">
+            <span id="englishGloss">I would like to rent a cabin.</span>
+            <div id="focusTags" class="focus-tags"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <button id="recordBtn" class="btn btn-record" type="button">
+          &#9679; Record Microphone
+        </button>
+        <div id="meterWrap" class="meter-wrap">
+          <canvas id="levelMeter" width="90" height="18"></canvas>
+          <span id="recordTimer">0.0s</span>
+        </div>
+
+        <label class="btn" for="audioFileInput" style="margin:0;">
+          &#8679; Upload Audio File
+        </label>
+        <input id="audioFileInput" type="file" accept="audio/*" style="display:none;" />
+
+        <button id="analyzeRecordingBtn" class="btn btn-primary" type="button" disabled>
+          Analyze Recording
+        </button>
+      </div>
+
+      <div id="errorBanner" class="error-banner" style="margin-top:14px;"></div>
+      <div id="loadingOverlay" class="loading-overlay" style="margin-top:14px;">
+        <div class="spinner"></div>
+        <span id="loadingText">Running wav2vec2 phoneme recognition &amp; CTC forced alignment...</span>
+      </div>
+    </section>
+
+    <!-- Instant Built-in Demo Clips -->
+    <section class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">2. Or Try Built-in Test Recordings (1-Click)</h2>
+          <p class="card-subtitle">Compare native German clips against deliberate learner mistakes — no microphone required.</p>
+        </div>
+      </div>
+      <div id="samplesGrid" class="samples-grid"></div>
+    </section>
+
+    <!-- Results Section -->
+    <div id="resultsSection">
+      <!-- Score Overview -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Pronunciation Assessment</h2>
+            <p id="activeClipLabel" class="card-subtitle">Scored against canonical German phonemes (no language-model auto-correction).</p>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-dot" style="background:var(--good)"></span>Good (&ge;76)</span>
+            <span class="legend-item"><span class="legend-dot" style="background:var(--fair)"></span>Fair (52–75)</span>
+            <span class="legend-item"><span class="legend-dot" style="background:var(--error)"></span>Error (&lt;52)</span>
+            <span class="legend-item"><span class="legend-dot" style="background:var(--omitted)"></span>Omitted</span>
+          </div>
+        </div>
+
+        <div class="summary-grid">
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="58" fill="none" stroke="#e2e8f0" stroke-width="12" />
+              <circle id="gaugeRing" cx="70" cy="70" r="58" fill="none" stroke="#059669" stroke-width="12"
+                      stroke-linecap="round" stroke-dasharray="364.42" stroke-dashoffset="364.42"
+                      transform="rotate(-90 70 70)" style="transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease;" />
+              <text id="gaugeScoreText" x="70" y="72" text-anchor="middle" class="gauge-score">0</text>
+              <text x="70" y="92" text-anchor="middle" class="gauge-label">Overall</text>
+            </svg>
+          </div>
+
+          <div class="metrics-list">
+            <div class="metric-row">
+              <span class="metric-label">Phoneme Accuracy</span>
+              <div class="metric-bar-bg"><div id="barAccuracy" class="metric-bar-fill" style="width:0%;background:var(--accent)"></div></div>
+              <span id="valAccuracy" class="metric-val">—</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Completeness</span>
+              <div class="metric-bar-bg"><div id="barCompleteness" class="metric-bar-fill" style="width:0%;background:var(--good)"></div></div>
+              <span id="valCompleteness" class="metric-val">—</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Vowel Length</span>
+              <div class="metric-bar-bg"><div id="barDuration" class="metric-bar-fill" style="width:0%;background:#7c3aed"></div></div>
+              <span id="valDuration" class="metric-val">—</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Free-Decode Match</span>
+              <div class="metric-bar-bg"><div id="barPer" class="metric-bar-fill" style="width:0%;background:#0284c7"></div></div>
+              <span id="valPer" class="metric-val">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="audio-playback-bar">
+          <strong style="font-size:13px;color:var(--text-muted);">Analyzed Audio:</strong>
+          <audio id="userAudioPlayer" controls></audio>
+          <span style="font-size:12px;color:var(--text-faint);">Tip: click any word or phoneme below to replay that exact segment.</span>
+        </div>
+      </section>
+
+      <!-- Word & Phoneme Breakdown -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Word &amp; Phoneme Breakdown (CTC Forced Alignment + Logit-GOP)</h2>
+            <p class="card-subtitle">Click a word to play it, or click any IPA tile to inspect its GOP score, duration, and German coaching tip.</p>
+          </div>
+        </div>
+
+        <div id="wordsStrip" class="words-strip"></div>
+        <div id="phonemeWordsWrap" class="phoneme-words-wrap"></div>
+
+        <div id="inspectorBox" class="inspector-box">
+          <div class="inspector-grid">
+            <div style="flex:1 1 320px;">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span id="inspTitle" class="ipa" style="font-size:18px;font-weight:800;"></span>
+                <span id="inspBadge" class="sample-badge"></span>
+              </div>
+              <p id="inspDiagnosis" style="margin:8px 0 4px;font-size:14px;"></p>
+              <p id="inspTip" style="margin:0;font-size:13px;color:var(--text-muted);"></p>
+              <div id="inspStats" class="inspector-stats"></div>
+            </div>
+            <button id="inspPlayBtn" class="btn" type="button">&#9654; Play This Sound</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Actionable Coaching Issues -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Diagnosis &amp; Coaching Tips</h2>
+            <p class="card-subtitle">Prioritized list of sounds to practice based on acoustic GOP and vowel duration.</p>
+          </div>
+        </div>
+        <div id="issuesList" class="issues-list"></div>
+      </section>
+
+      <!-- Free Phoneme Decoding Diff -->
+      <section class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Free Phoneme Decoding (No Language Model)</h2>
+            <p class="card-subtitle">Greedy CTC IPA output aligned via Levenshtein distance — catches dropped &amp; inserted sounds.</p>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-dot" style="background:var(--good-border)"></span>Match</span>
+            <span class="legend-item"><span class="legend-dot" style="background:var(--error-border)"></span>Substitution (exp&rarr;heard)</span>
+            <span class="legend-item"><span class="legend-dot" style="background:var(--omitted-border)"></span>Deleted</span>
+            <span class="legend-item"><span class="legend-dot" style="background:#bfdbfe"></span>Inserted</span>
+          </div>
+        </div>
+        <div style="font-size:13px;color:var(--text-muted);display:grid;gap:4px;">
+          <div><strong>Expected IPA:</strong> <span id="expectedIpaText" class="ipa"></span></div>
+          <div><strong>Heard IPA&nbsp;&nbsp;&nbsp;&nbsp;:</strong> <span id="heardIpaText" class="ipa"></span></div>
+        </div>
+        <div id="diffStrip" class="diff-strip ipa"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <span>100% local &amp; open-source &middot; Runs on CPU via <code>facebook/wav2vec2-xlsr-53-espeak-cv-ft</code> + <code>espeak-ng</code> + <code>torchaudio.functional.forced_align</code></span>
+    <span>No audio leaves your machine.</span>
+  </footer>
+
+  <audio id="refAudioPlayer" style="display:none;"></audio>
+
+  <script>
+    const state = {
+      presets: [],
+      samples: [],
+      selectedPresetId: null,
+      activeSampleId: null,
+      recordedBlob: null,
+      recordedFilename: "recording.webm",
+      mediaRecorder: null,
+      audioStream: null,
+      audioCtx: null,
+      analyser: null,
+      rafId: null,
+      recStartTime: 0,
+      timerInterval: null,
+      lastResult: null,
+      segmentStopTimer: null,
+      currentAudioUrl: null,
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    function showError(msg) {
+      const el = $("errorBanner");
+      if (!msg) {
+        el.classList.remove("visible");
+        el.textContent = "";
+      } else {
+        el.textContent = msg;
+        el.classList.add("visible");
+      }
+    }
+
+    function setLoading(active, text = "Running wav2vec2 phoneme recognition & CTC forced alignment...") {
+      $("loadingText").textContent = text;
+      $("loadingOverlay").classList.toggle("visible", active);
+    }
+
+    function scoreColor(score) {
+      if (score >= 80) return "#059669";
+      if (score >= 60) return "#d97706";
+      return "#dc2626";
+    }
+
+    // Play an exact time slice [startS, endS] of the analyzed audio player
+    function playSegment(startS, endS, padS = 0.04) {
+      const player = $("userAudioPlayer");
+      if (!player.src) return;
+      if (state.segmentStopTimer) {
+        clearTimeout(state.segmentStopTimer);
+        state.segmentStopTimer = null;
+      }
+      const from = Math.max(0, startS - padS);
+      const to = Math.max(from + 0.14, endS + padS);
+      player.currentTime = from;
+      player.play().catch(() => {});
+      state.segmentStopTimer = setTimeout(() => {
+        player.pause();
+      }, Math.round((to - from) * 1000));
+    }
+
+    // Poll model readiness
+    async function pollHealth() {
+      try {
+        const res = await fetch("/api/health");
+        const data = await res.json();
+        const pill = $("modelStatus");
+        const txt = $("modelStatusText");
+        pill.className = "status-pill " + data.status;
+        if (data.status === "ready") {
+          txt.textContent = `Model ready (${data.device.toUpperCase()})`;
+          return;
+        } else if (data.status === "error") {
+          txt.textContent = "Model error";
+          showError("Failed to load acoustic model: " + data.error);
+          return;
+        } else {
+          txt.textContent = "Loading wav2vec2 model...";
+        }
+      } catch (e) {
+        $("modelStatusText").textContent = "Connecting...";
+      }
+      setTimeout(pollHealth, 1500);
+    }
+
+    async function loadPresetsAndSamples() {
+      const [pRes, sRes] = await Promise.all([fetch("/api/presets"), fetch("/api/samples")]);
+      const pData = await pRes.json();
+      const sData = await sRes.json();
+      state.presets = pData.presets || [];
+      state.samples = sData.samples || [];
+
+      renderPresets();
+      renderSamples();
+
+      if (state.presets.length > 0) {
+        selectPreset(state.presets[0].id);
+      }
+    }
+
+    function renderPresets() {
+      const row = $("presetRow");
+      row.innerHTML = "";
+      for (const p of state.presets) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "preset-chip" + (p.id === state.selectedPresetId ? " active" : "");
+        btn.textContent = p.title;
+        btn.onclick = () => selectPreset(p.id);
+        row.appendChild(btn);
+      }
+    }
+
+    function selectPreset(presetId) {
+      state.selectedPresetId = presetId;
+      const preset = state.presets.find((p) => p.id === presetId);
+      if (!preset) return;
+
+      $("referenceText").value = preset.text;
+      $("englishGloss").textContent = preset.english;
+      const tags = $("focusTags");
+      tags.innerHTML = "";
+      for (const f of preset.focus) {
+        const span = document.createElement("span");
+        span.className = "focus-tag ipa";
+        span.textContent = f;
+        tags.appendChild(span);
+      }
+
+      const refBtn = $("playRefBtn");
+      if (preset.reference_audio_url) {
+        refBtn.disabled = false;
+        refBtn.dataset.url = preset.reference_audio_url;
+      } else {
+        refBtn.disabled = true;
+      }
+
+      renderPresets();
+    }
+
+    function renderSamples() {
+      const grid = $("samplesGrid");
+      grid.innerHTML = "";
+      for (const s of state.samples) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "sample-card" + (s.id === state.activeSampleId ? " active" : "");
+        card.innerHTML = `
+          <span class="sample-badge ${s.kind}">${s.kind === "native" ? "Native German" : "Learner Error"}</span>
+          <div class="sample-title">${s.label}</div>
+          <div class="sample-desc">${s.description}</div>
+        `;
+        card.onclick = () => runDemoSample(s);
+        grid.appendChild(card);
+      }
+    }
+
+    async function runDemoSample(sample) {
+      showError(null);
+      state.activeSampleId = sample.id;
+      renderSamples();
+
+      // Sync preset / reference text
+      const matchingPreset = state.presets.find((p) => p.id === sample.preset_id);
+      if (matchingPreset) {
+        selectPreset(matchingPreset.id);
+      } else {
+        $("referenceText").value = sample.reference_text;
+      }
+
+      setLoading(true, `Analyzing "${sample.label}"...`);
+      try {
+        const form = new FormData();
+        form.append("reference_text", sample.reference_text);
+        const res = await fetch(`/api/analyze-sample/${encodeURIComponent(sample.id)}`, {
+          method: "POST",
+          body: form,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Analysis failed.");
+
+        setAudioPlayerUrl(sample.audio_url);
+        renderResult(data, `${sample.label} — ${sample.description}`);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function setAudioPlayerUrl(url, isObjectUrl = false) {
+      if (state.currentAudioUrl && state.currentAudioUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(state.currentAudioUrl);
+      }
+      state.currentAudioUrl = url;
+      const player = $("userAudioPlayer");
+      player.src = url;
+      player.load();
+    }
+
+    // Microphone recording
+    async function toggleRecording() {
+      if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+        stopRecording();
+        return;
+      }
+      showError(null);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        state.audioStream = stream;
+
+        const mimeCandidates = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
+        const mimeType = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        const chunks = [];
+
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+        };
+        recorder.onstop = async () => {
+          cleanupMicStream();
+          const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+          const ext = (recorder.mimeType || "").includes("ogg") ? "ogg" : ((recorder.mimeType || "").includes("mp4") ? "m4a" : "webm");
+          state.recordedBlob = blob;
+          state.recordedFilename = `mic_recording.${ext}`;
+          state.activeSampleId = null;
+          renderSamples();
+          $("analyzeRecordingBtn").disabled = false;
+          setAudioPlayerUrl(URL.createObjectURL(blob), true);
+          // Auto-analyze right after stopping recording for a seamless demo experience!
+          await analyzeBlob(blob, state.recordedFilename, "Your microphone recording");
+        };
+
+        state.mediaRecorder = recorder;
+        recorder.start();
+        startMeter(stream);
+
+        const recBtn = $("recordBtn");
+        recBtn.classList.add("recording");
+        recBtn.innerHTML = "&#9632; Stop &amp; Analyze";
+        $("meterWrap").classList.add("visible");
+        state.recStartTime = performance.now();
+        state.timerInterval = setInterval(() => {
+          const secs = (performance.now() - state.recStartTime) / 1000;
+          $("recordTimer").textContent = secs.toFixed(1) + "s";
+        }, 100);
+      } catch (err) {
+        showError("Microphone access denied or unavailable: " + err.message);
+      }
+    }
+
+    function stopRecording() {
+      if (state.mediaRecorder && state.mediaRecorder.state === "recording") {
+        state.mediaRecorder.stop();
+      }
+      const recBtn = $("recordBtn");
+      recBtn.classList.remove("recording");
+      recBtn.innerHTML = "&#9679; Record Microphone";
+      $("meterWrap").classList.remove("visible");
+      if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+      }
+    }
+
+    function startMeter(stream) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      state.audioCtx = ctx;
+      state.analyser = analyser;
+
+      const canvas = $("levelMeter");
+      const g = canvas.getContext("2d");
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+
+      const draw = () => {
+        if (!state.analyser) return;
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        const pct = Math.min(1, rms * 4.5);
+        g.clearRect(0, 0, canvas.width, canvas.height);
+        g.fillStyle = "#dc2626";
+        g.fillRect(0, 0, Math.round(canvas.width * pct), canvas.height);
+        state.rafId = requestAnimationFrame(draw);
+      };
+      draw();
+    }
+
+    function cleanupMicStream() {
+      if (state.rafId) cancelAnimationFrame(state.rafId);
+      state.rafId = null;
+      if (state.audioCtx) {
+        state.audioCtx.close().catch(() => {});
+        state.audioCtx = null;
+        state.analyser = null;
+      }
+      if (state.audioStream) {
+        state.audioStream.getTracks().forEach((t) => t.stop());
+        state.audioStream = null;
+      }
+    }
+
+    async function analyzeBlob(blob, filename, label) {
+      const text = $("referenceText").value.trim();
+      if (!text) {
+        showError("Please enter a German sentence to score against.");
+        return;
+      }
+      showError(null);
+      setLoading(true, `Analyzing ${label}...`);
+      try {
+        const form = new FormData();
+        form.append("reference_text", text);
+        form.append("audio", blob, filename);
+        const res = await fetch("/api/analyze", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Analysis failed.");
+        renderResult(data, label);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderResult(result, clipLabel) {
+      state.lastResult = result;
+      $("resultsSection").classList.add("visible");
+      $("activeClipLabel").textContent = clipLabel || result.reference_text;
+
+      // Gauge
+      const circum = 2 * Math.PI * 58;
+      const offset = circum * (1 - result.overall_score / 100);
+      const ring = $("gaugeRing");
+      ring.style.strokeDashoffset = offset.toFixed(2);
+      ring.style.stroke = scoreColor(result.overall_score);
+      $("gaugeScoreText").textContent = Math.round(result.overall_score);
+
+      // Metric bars
+      const setBar = (barId, valId, val, suffix = "%") => {
+        const clamped = Math.max(0, Math.min(100, val));
+        $(barId).style.width = clamped + "%";
+        $(barId).style.background = scoreColor(clamped);
+        $(valId).textContent = Math.round(val) + suffix;
+      };
+      setBar("barAccuracy", "valAccuracy", result.accuracy_score, "");
+      setBar("barCompleteness", "valCompleteness", result.completeness_score, "%");
+      setBar("barDuration", "valDuration", result.duration_score, "%");
+      const freeMatch = Math.max(0, (1 - result.phoneme_error_rate) * 100);
+      setBar("barPer", "valPer", freeMatch, "%");
+
+      // Word pills
+      const wordsStrip = $("wordsStrip");
+      wordsStrip.innerHTML = "";
+      for (const w of result.words) {
+        const el = document.createElement("div");
+        el.className = `word-pill ${w.status}`;
+        el.innerHTML = `
+          <div class="word-pill-top">
+            <span class="word-pill-text">${w.word}</span>
+            <span class="word-pill-score">${Math.round(w.score)}</span>
+          </div>
+          <div class="word-pill-ipa ipa">/${w.expected_ipa}/</div>
+        `;
+        el.onclick = () => {
+          playSegment(w.start_s, w.end_s, 0.05);
+          document.querySelectorAll(".word-pill").forEach((x) => x.classList.remove("selected"));
+          el.classList.add("selected");
+          const worst = [...w.phonemes].sort((a, b) => a.score - b.score)[0];
+          if (worst) inspectPhoneme(worst);
+        };
+        wordsStrip.appendChild(el);
+      }
+
+      // Phoneme tiles grouped by word
+      const phWrap = $("phonemeWordsWrap");
+      phWrap.innerHTML = "";
+      for (const w of result.words) {
+        const grp = document.createElement("div");
+        grp.className = "phoneme-word-group";
+        const head = document.createElement("div");
+        head.className = "phoneme-word-label";
+        head.innerHTML = `<span>${w.word}</span><span>${Math.round(w.score)}</span>`;
+        grp.appendChild(head);
+
+        const tiles = document.createElement("div");
+        tiles.className = "phoneme-tiles";
+        for (const p of w.phonemes) {
+          const tile = document.createElement("div");
+          tile.className = `ph-tile ${p.status}`;
+          tile.dataset.phIndex = p.index;
+
+          let subText = Math.round(p.score);
+          if (p.status === "omitted") {
+            subText = "omitted";
+          } else if (p.length_issue === "too_short") {
+            subText = "too short";
+          } else if (p.length_issue === "too_long") {
+            subText = "too long";
+          } else if (p.status !== "good" && p.heard_ipa && p.heard_ipa !== p.expected_ipa) {
+            subText = `→ ${p.heard_ipa}`;
+          }
+
+          tile.innerHTML = `
+            <div class="ph-sym ipa">${p.expected_ipa}</div>
+            <div class="ph-sub ipa">${subText}</div>
+            <div class="ph-dur">${Math.round(p.duration_ms)}ms</div>
+          `;
+          tile.onclick = () => {
+            inspectPhoneme(p);
+            playSegment(p.start_s, p.end_s, 0.06);
+          };
+          tiles.appendChild(tile);
+        }
+        grp.appendChild(tiles);
+        phWrap.appendChild(grp);
+      }
+
+      // Auto-select the worst phoneme in inspector if any issues exist
+      const allPh = result.words.flatMap((w) => w.phonemes);
+      const worstPh = [...allPh].sort((a, b) => a.score - b.score)[0];
+      if (worstPh && worstPh.status !== "good") {
+        inspectPhoneme(worstPh);
+      } else {
+        $("inspectorBox").classList.remove("visible");
+      }
+
+      // Issues list
+      const issuesList = $("issuesList");
+      issuesList.innerHTML = "";
+      if (!result.top_issues || result.top_issues.length === 0) {
+        issuesList.innerHTML = `
+          <div style="padding:14px 16px;border-radius:10px;background:var(--good-bg);border:1px solid var(--good-border);color:#065f46;font-weight:600;">
+            All German phonemes and vowel lengths scored cleanly — no pronunciation errors detected!
+          </div>
+        `;
+      } else {
+        for (const iss of result.top_issues) {
+          const item = document.createElement("div");
+          item.className = `issue-item ${iss.status}`;
+          const heardStr = iss.heard_ipa && iss.heard_ipa !== iss.expected_ipa
+            ? ` &rarr; heard <span class="ipa">/${iss.heard_ipa}/</span>`
+            : (iss.status === "omitted" ? " &rarr; omitted" : "");
+          item.innerHTML = `
+            <div style="flex:1;">
+              <div class="issue-head">
+                ${iss.word} &middot; <span class="ipa">/${iss.expected_ipa}/</span>${heardStr}
+                <span style="font-weight:600;opacity:0.75;font-size:12px;">(score ${Math.round(iss.score)})</span>
+              </div>
+              <div class="issue-body">${iss.diagnosis}</div>
+              ${iss.tip && !iss.diagnosis.includes(iss.tip) ? `<div class="issue-tip"><strong>Tip:</strong> ${iss.tip}</div>` : ""}
+            </div>
+            <button class="btn" type="button" style="flex-shrink:0;padding:7px 11px;font-size:12.5px;">&#9654; Hear</button>
+          `;
+          item.querySelector("button").onclick = () => playSegment(iss.start_s, iss.end_s, 0.08);
+          issuesList.appendChild(item);
+        }
+      }
+
+      // Free decoding diff
+      $("expectedIpaText").textContent = "/" + result.expected_ipa + "/";
+      $("heardIpaText").textContent = "/" + (result.heard_ipa || "—") + "/";
+      const diffStrip = $("diffStrip");
+      diffStrip.innerHTML = "";
+      for (const op of result.free_diff || []) {
+        const span = document.createElement("span");
+        span.className = `diff-tok ${op.op}`;
+        if (op.op === "match") {
+          span.textContent = op.expected;
+          span.title = `Matched /${op.expected}/ (heard /${op.predicted}/)`;
+        } else if (op.op === "sub") {
+          span.textContent = `${op.expected}→${op.predicted}`;
+          span.title = `Substituted: expected /${op.expected}/, heard /${op.predicted}/`;
+        } else if (op.op === "del") {
+          span.textContent = op.expected;
+          span.title = `Deleted: expected /${op.expected}/ was not decoded`;
+        } else if (op.op === "ins") {
+          span.textContent = `+${op.predicted}`;
+          span.title = `Inserted extra sound /${op.predicted}/`;
+        }
+        diffStrip.appendChild(span);
+      }
+
+      $("resultsSection").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function inspectPhoneme(p) {
+      document.querySelectorAll(".ph-tile").forEach((t) => {
+        t.classList.toggle("selected", Number(t.dataset.phIndex) === p.index);
+      });
+      const box = $("inspectorBox");
+      box.classList.add("visible");
+
+      const heardPart = p.status === "omitted"
+        ? " → omitted"
+        : (p.heard_ipa && p.heard_ipa !== p.expected_ipa ? ` → heard /${p.heard_ipa}/` : "");
+      $("inspTitle").textContent = `${p.word}: /${p.expected_ipa}/${heardPart}`;
+
+      const badge = $("inspBadge");
+      badge.textContent = `${p.status.toUpperCase()} · ${Math.round(p.score)}/100`;
+      badge.className = "sample-badge " + (p.status === "good" ? "native" : "mispronounced");
+
+      $("inspDiagnosis").textContent = p.diagnosis || `Pronounced cleanly as /${p.expected_ipa}/.`;
+      $("inspTip").textContent = p.tip ? `Articulation tip: ${p.tip}` : "";
+
+      const vowelTag = p.is_long_vowel ? "Long vowel" : (p.is_short_vowel ? "Short vowel" : (p.is_vowel ? "Vowel" : "Consonant"));
+      $("inspStats").innerHTML = `
+        <span class="stat-chip">Logit-GOP: <strong>${p.logit_gop >= 0 ? "+" : ""}${p.logit_gop.toFixed(2)}</strong></span>
+        <span class="stat-chip">Posterior-GOP: <strong>${p.posterior_gop.toFixed(2)}</strong></span>
+        <span class="stat-chip">Confidence: <strong>${Math.round(p.confidence * 100)}%</strong></span>
+        <span class="stat-chip">Duration: <strong>${Math.round(p.duration_ms)} ms</strong> (${vowelTag})</span>
+        <span class="stat-chip">Window: <strong>${p.start_s.toFixed(2)}s – ${p.end_s.toFixed(2)}s</strong></span>
+        <span class="stat-chip">Free CTC: <strong>${p.free_op}</strong></span>
+      `;
+      $("inspPlayBtn").onclick = () => playSegment(p.start_s, p.end_s, 0.08);
+    }
+
+    // Event wiring
+    $("recordBtn").onclick = toggleRecording;
+
+    $("audioFileInput").onchange = async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      state.recordedBlob = file;
+      state.recordedFilename = file.name;
+      state.activeSampleId = null;
+      renderSamples();
+      $("analyzeRecordingBtn").disabled = false;
+      setAudioPlayerUrl(URL.createObjectURL(file), true);
+      await analyzeBlob(file, file.name, `Uploaded file: ${file.name}`);
+      ev.target.value = "";
+    };
+
+    $("analyzeRecordingBtn").onclick = () => {
+      if (state.recordedBlob) {
+        analyzeBlob(state.recordedBlob, state.recordedFilename, "Your recording");
+      }
+    };
+
+    $("playRefBtn").onclick = () => {
+      const url = $("playRefBtn").dataset.url;
+      if (!url) return;
+      const refPlayer = $("refAudioPlayer");
+      refPlayer.src = url;
+      refPlayer.play().catch(() => {});
+    };
+
+    // Init
+    pollHealth();
+    loadPresetsAndSamples();
+  </script>
+</body>
+</html>

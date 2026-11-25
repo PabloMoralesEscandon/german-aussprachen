@@ -1,0 +1,76 @@
+[project]
+name = "german-aussprachen"
+version = "0.1.0"
+description = "Open-source, local German pronunciation assessment engine using wav2vec2 IPA phoneme recognition, CTC forced alignment, and Logit-GOP scoring."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<3.13"
+authors = [
+    { name = "Pablo Morales Escandón" },
+]
+keywords = [
+    "german",
+    "pronunciation-assessment",
+    "phonetics",
+    "ipa",
+    "wav2vec2",
+    "gop",
+    "ctc-forced-alignment",
+    "speech",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: German",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.4.0",
+    "torchaudio>=2.4.0",
+    "transformers>=4.45.0",
+    "phonemizer>=3.3.0",
+    "espeakng-loader>=0.2.4",
+    "numpy>=1.26.0",
+    "soundfile>=0.12.1",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.12",
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+    "edge-tts>=6.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/PabloMoralesEscandon/german-aussprachen"
+Repository = "https://github.com/PabloMoralesEscandon/german-aussprachen"
+Issues = "https://github.com/PabloMoralesEscandon/german-aussprachen/issues"
+
+[project.scripts]
+aussprache = "german_aussprachen.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/german_aussprachen"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchaudio = { index = "pytorch-cpu" }
